@@ -276,12 +276,9 @@ mod quic_impl {
                                     padding: Vec::new(),
                                 });
 
-                                let mut response_data = FrameParser::serialize(&challenge_frame)
+                                let response_data = FrameParser::serialize(&challenge_frame)
                                     .context("Failed to serialize ROXY_CHALLENGE")?;
-                                FrameParser::add_padding(&mut response_data, 255);
-                                let new_len = (response_data.len() - 4) as u32;
-                                response_data[0..4].copy_from_slice(&new_len.to_be_bytes());
-
+                                // Don't add padding to RoxyChallenge since challenge_data contains SCRAM data
                                 send.write_all(&response_data).await?;
                                 send.flush().await?;
 
@@ -344,12 +341,9 @@ mod quic_impl {
                                     padding: Vec::new(),
                                 });
 
-                                let mut response_data = FrameParser::serialize(&welcome_frame)
+                                let response_data = FrameParser::serialize(&welcome_frame)
                                     .context("Failed to serialize ROXY_WELCOME")?;
-                                FrameParser::add_padding(&mut response_data, 255);
-                                let new_len = (response_data.len() - 4) as u32;
-                                response_data[0..4].copy_from_slice(&new_len.to_be_bytes());
-
+                                // Don't add padding to RoxyWelcome since server_final contains base64 data
                                 send.write_all(&response_data).await?;
                                 send.flush().await?;
 

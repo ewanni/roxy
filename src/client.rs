@@ -348,10 +348,8 @@ impl RoxyClient {
 
         // Send init frame
         {
-            let mut frame_data = FrameParser::serialize(&init_frame)?;
-            FrameParser::add_padding(&mut frame_data, 255);
-            let new_len = (frame_data.len() - 4) as u32;
-            frame_data[0..4].copy_from_slice(&new_len.to_be_bytes());
+            let frame_data = FrameParser::serialize(&init_frame)?;
+            // Don't add padding to RoxyInit since padding field contains SCRAM data
             stream.write_all(&frame_data).await?;
             stream.flush().await?;
         }

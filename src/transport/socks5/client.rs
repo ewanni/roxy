@@ -219,10 +219,8 @@ async fn perform_roxy_handshake(
         padding: Vec::new(),
     });
 
-    let mut init_data = FrameParser::serialize(&init_frame)?;
-    FrameParser::add_padding(&mut init_data, 255);
-    let new_len = (init_data.len() - 4) as u32;
-    init_data[0..4].copy_from_slice(&new_len.to_be_bytes());
+    let init_data = FrameParser::serialize(&init_frame)?;
+    // Don't add padding to RoxyInit since padding field contains data
     stream.write_all(&init_data).await?;
     stream.flush().await?;
     debug!("Sent ROXY_INIT");
