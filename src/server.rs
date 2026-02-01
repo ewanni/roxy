@@ -638,11 +638,19 @@ impl Server {
             if auth.session_id != *session_id {
                 return Err(anyhow::anyhow!("Session ID mismatch"));
             }
+            
+            let client_final = std::str::from_utf8(&auth.auth_proof)?;
+            // Note: verify_client_final will fail if SCRAM proof is invalid,
+            // which handles the case where user_valid is false (dummy credentials used).
+            // This maintains timing attack resistance by always computing PBKDF2.
+            let server_final = scram_server.verify_client_final(client_final)?;
+            
+            // Verify that user actually exists (post-verification security check).
+            // If scram_server.verify_client_final succeeded with dummy credentials,
+            // this indicates a protocol violation and we reject here.
             if !*user_valid {
                 return Err(anyhow::anyhow!("Authentication failed"));
             }
-            let client_final = std::str::from_utf8(&auth.auth_proof)?;
-            let server_final = scram_server.verify_client_final(client_final)?;
 
             // Get user auth
             let username = session.username.as_ref().unwrap();
