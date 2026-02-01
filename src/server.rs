@@ -453,13 +453,16 @@ impl Server {
                             Ok(Some(response_frame)) => {
                                 let mut response_data = FrameParser::serialize(&response_frame)?;
                                 FrameParser::add_padding(&mut response_data, 255);
-
+        
                                 // Apply DPI bypass obfuscation: traffic shaping with padding and jitter
                                 let shaper = TrafficShaper::new();
                                 let _shaped_chunks = shaper.shape(&response_data);
                                 // In production, send shaped chunks with timing delays
                                 // For now, padding is applied above; timing jitter would be applied here
-
+        
+                                let new_len = (response_data.len() - 4) as u32;
+                                response_data[0..4].copy_from_slice(&new_len.to_be_bytes());
+        
                                 // Apply bandwidth limiting
                                 if let Some(limiter) = &session.bandwidth_limiter {
                                     let data_size = response_data.len() as u32;
@@ -470,10 +473,10 @@ impl Server {
                                         }
                                     }
                                 }
-
+        
                                 stream.write_all(&response_data).await?;
                                 stream.flush().await?;
-
+        
                                 // Track bytes sent to client
                                 total_bytes_sent += response_data.len() as u64;
                             }

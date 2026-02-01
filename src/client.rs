@@ -350,6 +350,8 @@ impl RoxyClient {
         {
             let mut frame_data = FrameParser::serialize(&init_frame)?;
             FrameParser::add_padding(&mut frame_data, 255);
+            let new_len = (frame_data.len() - 4) as u32;
+            frame_data[0..4].copy_from_slice(&new_len.to_be_bytes());
             stream.write_all(&frame_data).await?;
             stream.flush().await?;
         }
@@ -415,6 +417,8 @@ impl RoxyClient {
         {
             let mut frame_data = FrameParser::serialize(&auth_frame)?;
             FrameParser::add_padding(&mut frame_data, 255);
+            let new_len = (frame_data.len() - 4) as u32;
+            frame_data[0..4].copy_from_slice(&new_len.to_be_bytes());
             stream.write_all(&frame_data).await?;
             stream.flush().await?;
         }
@@ -534,7 +538,7 @@ impl RoxyClient {
 
         let mut frame_data = FrameParser::serialize(&data_frame)?;
         FrameParser::add_padding(&mut frame_data, 255);
-        
+
         // Apply DPI bypass obfuscation: traffic shaping with padding
         let shaper = TrafficShaper::new();
         let _shaped_chunks = shaper.shape(&frame_data);
@@ -542,7 +546,10 @@ impl RoxyClient {
         PaddingStrategy::new(1024).add_padding(&mut frame_data);
         // Optional: Add timing jitter before send
         TimingObfuscator::new(0, 10).add_jitter().await;
-        
+
+        let new_len = (frame_data.len() - 4) as u32;
+        frame_data[0..4].copy_from_slice(&new_len.to_be_bytes());
+
         stream.write_all(&frame_data).await?;
         stream.flush().await?;
 

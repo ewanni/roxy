@@ -276,8 +276,11 @@ mod quic_impl {
                                     padding: Vec::new(),
                                 });
 
-                                let response_data = FrameParser::serialize(&challenge_frame)
+                                let mut response_data = FrameParser::serialize(&challenge_frame)
                                     .context("Failed to serialize ROXY_CHALLENGE")?;
+                                FrameParser::add_padding(&mut response_data, 255);
+                                let new_len = (response_data.len() - 4) as u32;
+                                response_data[0..4].copy_from_slice(&new_len.to_be_bytes());
 
                                 send.write_all(&response_data).await?;
                                 send.flush().await?;
@@ -341,8 +344,11 @@ mod quic_impl {
                                     padding: Vec::new(),
                                 });
 
-                                let response_data = FrameParser::serialize(&welcome_frame)
+                                let mut response_data = FrameParser::serialize(&welcome_frame)
                                     .context("Failed to serialize ROXY_WELCOME")?;
+                                FrameParser::add_padding(&mut response_data, 255);
+                                let new_len = (response_data.len() - 4) as u32;
+                                response_data[0..4].copy_from_slice(&new_len.to_be_bytes());
 
                                 send.write_all(&response_data).await?;
                                 send.flush().await?;
@@ -400,8 +406,11 @@ mod quic_impl {
                                     padding: Vec::new(),
                                 });
 
-                                let response_data = FrameParser::serialize(&response)
+                                let mut response_data = FrameParser::serialize(&response)
                                     .context("Failed to serialize Data response")?;
+                                FrameParser::add_padding(&mut response_data, 255);
+                                let new_len = (response_data.len() - 4) as u32;
+                                response_data[0..4].copy_from_slice(&new_len.to_be_bytes());
 
                                 send.write_all(&response_data).await?;
                                 send.flush().await?;
@@ -412,8 +421,11 @@ mod quic_impl {
                             Frame::Ping => {
                                 // Handle Ping - respond with Pong (same frame for simplicity)
                                 let pong = Frame::Ping;
-                                let response_data = FrameParser::serialize(&pong)
+                                let mut response_data = FrameParser::serialize(&pong)
                                     .context("Failed to serialize Ping response")?;
+                                FrameParser::add_padding(&mut response_data, 255);
+                                let new_len = (response_data.len() - 4) as u32;
+                                response_data[0..4].copy_from_slice(&new_len.to_be_bytes());
 
                                 send.write_all(&response_data).await?;
                                 send.flush().await?;

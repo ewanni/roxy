@@ -219,7 +219,10 @@ async fn perform_roxy_handshake(
         padding: Vec::new(),
     });
 
-    let init_data = FrameParser::serialize(&init_frame)?;
+    let mut init_data = FrameParser::serialize(&init_frame)?;
+    FrameParser::add_padding(&mut init_data, 255);
+    let new_len = (init_data.len() - 4) as u32;
+    init_data[0..4].copy_from_slice(&new_len.to_be_bytes());
     stream.write_all(&init_data).await?;
     stream.flush().await?;
     debug!("Sent ROXY_INIT");
@@ -267,7 +270,10 @@ async fn perform_roxy_handshake(
         padding: Vec::new(),
     });
 
-    let auth_data = FrameParser::serialize(&auth_frame)?;
+    let mut auth_data = FrameParser::serialize(&auth_frame)?;
+    FrameParser::add_padding(&mut auth_data, 255);
+    let new_len = (auth_data.len() - 4) as u32;
+    auth_data[0..4].copy_from_slice(&new_len.to_be_bytes());
     stream.write_all(&auth_data).await?;
     stream.flush().await?;
     debug!("Sent ROXY_AUTH");
@@ -335,7 +341,10 @@ async fn send_data_frame(
     };
 
     let frame = Frame::Data(data_frame);
-    let frame_data = FrameParser::serialize(&frame)?;
+    let mut frame_data = FrameParser::serialize(&frame)?;
+    FrameParser::add_padding(&mut frame_data, 255);
+    let new_len = (frame_data.len() - 4) as u32;
+    frame_data[0..4].copy_from_slice(&new_len.to_be_bytes());
     stream.write_all(&frame_data).await?;
     stream.flush().await?;
 
@@ -367,8 +376,11 @@ async fn send_data_frame_async(
     };
 
     let frame = Frame::Data(data_frame);
-    let frame_data = FrameParser::serialize(&frame)?;
-    
+    let mut frame_data = FrameParser::serialize(&frame)?;
+    FrameParser::add_padding(&mut frame_data, 255);
+    let new_len = (frame_data.len() - 4) as u32;
+    frame_data[0..4].copy_from_slice(&new_len.to_be_bytes());
+
     let mut write_guard = roxy_write.lock().await;
     write_guard.write_all(&frame_data).await?;
     write_guard.flush().await?;
