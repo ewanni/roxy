@@ -1,0 +1,210 @@
+version: '3.8'
+
+services:
+  # ========================================
+  # ROXY Server (Main Service)
+  # ========================================
+  roxy-server:
+    container_name: roxy-server
+    # Use pre-built image from Docker Hub
+    image: ewanni/roxy:latest
+    
+    # Alternative: Build from source
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    #   args:
+    #     FEATURES: "tui-remote,quic-experimental"
+    #     PLATFORM: "x86_64-unknown-linux-musl"
+    
+    ports:
+      # Main ROXY server (TLS/TCP)
+      - "8443:8443"
+      # QUIC protocol (UDP, experimental)
+      - "4433:4433/udp"
+      # Metrics API for remote TUI monitoring
+      - "9090:9090"
+      # TLS/HTTPS proxy
+      - "443:443"
+      # SOCKS5 server (if enabled in config)
+      - "1081:1081"
+    
+    volumes:
+      # Configuration files
+      - ./config/config.yml:/app/config.yml:rw
+      # TLS certificates (read-only)
+      - ./certs:/app/certs:ro
+      # Logs directory (writable)
+      - ./logs:/app/logs:rw
+    
+    environment:
+      # Rust logging level
+      - RUST_LOG=info
+      # Rust backtrace for debugging
+      - RUST_BACKTRACE=1
+      # Optional: Custom config path
+      - ROXY_CONFIG=/app/config.yml
+      # Enable SOCKS5 server
+      - SOCKS5_ENABLED=true
+    
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Network configuration
+    networks:
+      - roxy-network
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # User (run as non-root)
+    # user: "1000:1000"  # Uncomment and adjust UID:GID if needed
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ========================================
+  # SOCKS5 Proxy Client
+  # ========================================
+  roxy-socks5-client:
+    container_name: roxy-socks5-client
+    image: ewanni/roxy:latest
+    
+    ports:
+      # SOCKS5 client listening port (local proxy)
+      - "1080:1080"
+    
+    volumes:
+      # Configuration files
+      - ./config/config.yml:/app/config.yml:rw
+      # TLS certificates (read-only)
+      - ./certs:/app/certs:ro
+      # Logs directory (writable)
+      - ./logs:/app/logs:rw
+    
+    environment:
+      # Rust logging level
+      - RUST_LOG=info
+      # Rust backtrace for debugging
+      - RUST_BACKTRACE=1
+      # Custom config path
+      - ROXY_CONFIG=/app/config.yml
+      # Enable SOCKS5 client connecting to remote server
+      - SOCKS5_CLIENT_ENABLED=true
+      # Remote SOCKS5 server address
+      - SOCKS5_SERVER_ADDR=roxy-server:1081
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Network configuration
+    networks:
+      - roxy-network
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Depends on server being ready
+    depends_on:
+      - roxy-server
+
+  # ========================================
+  # Optional: Prometheus Metrics Exporter
+  # ========================================
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   container_name: roxy-prometheus
+  #   ports:
+  #     - "9091:9090"
+  #   volumes:
+  #     - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #     - prometheus-data:/prometheus
+  #   command:
+  #     - '--config.file=/etc/prometheus/prometheus.yml'
+  #     - '--storage.tsdb.path=/prometheus'
+  #   networks:
+  #     - roxy-network
+  #   restart: unless-stopped
+
+  # ========================================
+  # Optional: Grafana Dashboard
+  # ========================================
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   container_name: roxy-grafana
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - GF_SECURITY_ADMIN_PASSWORD=admin
+  #     - GF_USERS_ALLOW_SIGN_UP=false
+  #   volumes:
+  #     - grafana-data:/var/lib/grafana
+  #     - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+  #     - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+  #   networks:
+  #     - roxy-network
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - prometheus
+
+# ========================================
+# Networks
+# ========================================
+networks:
+  roxy-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# ========================================
+# Volumes (for persistent data)
+# ========================================
+volumes:
+  # prometheus-data:
+  #   driver: local
+  # grafana-data:
+  #   driver: local
+  logs:
+    driver: local

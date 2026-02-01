@@ -1,0 +1,94 @@
+# ====================
+# RUST BUILD ARTIFACTS
+# ====================
+target/
+**/*.rs.bk
+*.pdb
+# Note: Cargo.lock is committed for binaries/applications
+
+
+# ====================
+# IDE И EDITOR
+# ====================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ====================
+# ЛОГИ
+# ====================
+*.log
+logs/
+*.log.*
+
+# ====================
+# СЕРТИФИКАТЫ И КЛЮЧИ
+# ====================
+certs/*.key
+certs/*.pem
+certs/*.crt
+!certs/.gitkeep
+
+# ====================
+# КОНФИГУРАЦИЯ (ПРИВАТНАЯ)
+# ====================
+config/users.yml
+config/*.local.yml
+.env
+.env.local
+
+# ====================
+# ВРЕМЕННЫЕ ФАЙЛЫ
+# ====================
+tmp/
+temp/
+*.tmp
+*.bak
+
+# ====================
+# DOCKER
+# ====================
+.docker/
+
+# ====================
+# ПРОЕКТНЫЕ ОТЧЕТЫ (СТАРЫЕ/ВРЕМЕННЫЕ)
+# ====================
+plans/
+attack_results.md
+project_report.md
+SECURITY_AUDIT_protocol_rs.md
+VULNERABILITY_REMEDIATION_ROADMAP.md
+reports/temp/
+reports/draft/
+
+
+# ====================
+# DOCKER VOLUMES
+# ====================
+volumes/
+*.db
+*.sqlite
+*.sqlite3
+
+# ====================
+# GENERATED DOCS
+# ====================
+*.html
+*.pdf
+!docs/*.pdf
+
+# ====================
+# ПРОЧЕЕ
+# ====================
+.env.production
+.env.development
+*.swn
+node_modules/
+package-lock.json
+yarn.lock
+.cargo/
+.github/

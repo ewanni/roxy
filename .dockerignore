@@ -1,0 +1,111 @@
+# ====================
+# GIT И ВЕРСИОНИРОВАНИЕ
+# ====================
+.git/
+.gitignore
+.gitattributes
+
+# ====================
+# BUILD ARTIFACTS
+# ====================
+target/
+**/*.rs.bk
+*.pdb
+
+# ====================
+# IDE
+# ====================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ====================
+# DOCKER
+# ====================
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+.docker/
+
+# ====================
+# ДОКУМЕНТАЦИЯ (ИСХОДНИКИ)
+# ====================
+docs/
+!docs/protocol-design.md  # Keep protocol spec
+README.md
+README_ru.md
+*.md
+!README.md  # Keep for reference
+!README_ru.md
+
+# ====================
+# ТЕСТИРОВАНИЕ И CI/CD
+# ====================
+tests/
+.github/
+.gitlab-ci.yml
+.travis.yml
+**/*_test.rs
+**/*_tests.rs
+test/
+
+# ====================
+# КОНФИГУРАЦИЯ (DEVELOPMENT)
+# ====================
+config/*.local.yml
+.env*
+!.env.example
+
+# ====================
+# ВРЕМЕННЫЕ И ЛОГИ
+# ====================
+*.log
+logs/
+tmp/
+temp/
+
+# ====================
+# ПРОЕКТНЫЕ ФАЙЛЫ
+# ====================
+plans/
+reports/
+
+# ====================
+# OS
+# ====================
+.DS_Store
+Thumbs.db
+
+# ====================
+# CERTS (ЛОКАЛЬНЫЕ)
+# ====================
+certs/*.key
+certs/*.pem
+certs/*.crt
+
+# ====================
+# DOCKER BUILD CACHE
+# ====================
+.dockerignore
+docker-compose*.override.yml
+
+# ====================
+# EXAMPLES & SAMPLES
+# ====================
+examples/
+samples/
+benchmarks/
+
+# ====================
+# EDITOR METADATA
+# ====================
+*.code-workspace
+.history/
+
+# ====================
+# DATABASES
+# ====================
+*.db
+*.sqlite
+*.sqlite3
