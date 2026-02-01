@@ -1,14 +1,11 @@
 # ROXY - DPI Proxy с обходом блокировок
 
-![Rust](https://img.shields.io/badge/rust-1.75%2B-orange)
-![License](https://img.shields.io/badge/license-MIT-blue)
-![Build](https://img.shields.io/badge/build-passing-brightgreen)
-![Tests](https://img.shields.io/badge/tests-passing-brightgreen)
-![Audit](https://img.shields.io/badge/audit-clean-brightgreen)
+[![Rust](https://img.shields.io/badge/rust-1.75+-orange)](https://rust-lang.org)
+[![License](https://img.shields.io/badge/license-MIT-blue)](Cargo.toml)
 
 **ROXY** — высокопроизводительный прокси-сервер для обхода DPI (Deep Packet Inspection), написанный на Rust. Поддерживает SOCKS5, шифрование TLS 1.3, протокол QUIC (экспериментально) и продвинутый терминальный интерфейс для мониторинга в реальном времени.
 
-[🇬🇧 English version](README.md)
+[🇬🇧 English version]([`README.md`](README.md))
 
 ## 🌟 Возможности
 
@@ -68,16 +65,11 @@
 ### Требования
 
 - Rust 1.75+ ([установить](https://rustup.rs/))
-- OpenSSL (для TLS)
 - Linux, macOS или Windows (рекомендуется WSL)
 
 ### Сборка из исходников
 
 ```bash
-# Клонировать репозиторий
-git clone https://github.com/yourusername/roxy.git
-cd roxy
-
 # Сборка с базовыми возможностями
 cargo build --release
 
@@ -103,15 +95,14 @@ openssl req -x509 -newkey rsa:4096 -nodes \
 # Для продакшена используйте Let's Encrypt или свой CA
 ```
 
-### Добавление первого пользователя
+### Создание конфигурации и добавление первого пользователя
 
 ```bash
 # Создать директорию конфигурации
 mkdir -p config
-cp config/config.yml config/users.yml  # Если не существует
 
 # Добавить пользователя интерактивно
-./target/release/roxy user --config config/users.yml add --name alice
+./target/release/roxy user --config config/config.yml add --name alice
 # Введите пароль по запросу
 ```
 
@@ -119,11 +110,11 @@ cp config/config.yml config/users.yml  # Если не существует
 
 ```bash
 # Запуск с конфигом по умолчанию
-./target/release/roxy server --config config/users.yml
+./target/release/roxy server --config config/config.yml
 
 # Или указать TLS сертификаты
 ./target/release/roxy server \
-  --config config/users.yml \
+  --config config/config.yml \
   --tls-cert certs/server.crt \
   --tls-key certs/server.key \
   --port 8443
@@ -133,7 +124,7 @@ cp config/config.yml config/users.yml  # Если не существует
 
 ```bash
 # Мониторинг локального сервера
-./target/release/roxy tui --config config/users.yml
+./target/release/roxy tui --config config/config.yml
 
 # Или мониторинг удаленного сервера (требует tui-remote)
 ./target/release/roxy tui --remote http://server:9090
@@ -164,19 +155,17 @@ cargo install --path . --features quic-experimental,tui-remote
 ### Через Docker
 
 ```bash
-# Скачать готовый образ
-docker pull ewanni/roxy:latest
+# Собрать образ
+docker build -t roxy:latest .
 
 # Запустить сервер
 docker run -d \
   -p 8443:8443 \
+  -p 4433:4433/udp \
   -v $(pwd)/config:/app/config \
   -v $(pwd)/certs:/app/certs \
   --name roxy-server \
-  ewanni/roxy:latest
-
-# Или собрать свой образ из исходников
-# docker build -t roxy:latest .
+  roxy:latest
 ```
 
 ### Через Docker Compose
@@ -201,56 +190,55 @@ ROXY использует YAML файлы конфигурации для сер
 ### Конфигурация сервера ([`config/config.yml`](config/config.yml))
 
 ```yaml
-# Настройки сервера
+# ROXY Configuration
+users: {}
+session_lifetime: 3600
+alpn_protocols: ["h2", "http/1.1"]
+log_level: "INFO"
+log_theme_path: "config/logging_theme.yml"
+log_to_file: false
+log_file_path: null
+
 server:
   bind_address: "0.0.0.0"
   port: 8443
   max_concurrent_connections: 1000
   buffer_size: 8192
 
-# Конфигурация TLS
 tls:
   enabled: true
   cert_path: "certs/server.crt"
   key_path: "certs/server.key"
   versions: ["1.3", "1.2"]
 
-# Настройки QUIC (опционально, требует quic-experimental)
+timeouts:
+  connect_timeout: 10
+  read_timeout: 30
+  write_timeout: 30
+  idle_timeout: 300
+
 quic:
   enabled: false
   bind_address: "0.0.0.0"
   port: 4433
   idle_timeout_ms: 30000
 
-# SOCKS5 прокси (включен по умолчанию)
 socks5:
-  enabled: true  # По умолчанию: true
-  bind_addr: "127.0.0.1:1080"      # SOCKS5 на стороне клиента (туннель через ROXY)
-  server_enabled: true              # По умолчанию: true
-  server_bind_addr: "127.0.0.1:1081"  # SOCKS5 на стороне сервера (прямой прокси)
+  enabled: true
+  bind_addr: "0.0.0.0:1080"
+  server_addr: "roxy-server:1081"
+  username: ""
+  password: ""
+  server_enabled: true
+  server_bind_addr: "0.0.0.0:1081"
 
-# Сессии и безопасность
-session_lifetime: 3600  # секунды
-alpn_protocols: ["h2", "http/1.1"]
 allow_plain_http: true
-default_bandwidth_limit_mbps: null  # null = неограниченно
-
-# Логирование
-log_level: "INFO"  # TRACE, DEBUG, INFO, WARN, ERROR
-log_to_file: false
-log_file_path: null
-
-# Таймауты
-timeouts:
-  connect_timeout: 10
-  read_timeout: 30
-  write_timeout: 30
-  idle_timeout: 300
+default_bandwidth_limit_mbps: null
 ```
 
 ### Конфигурация пользователей
 
-Пользователи хранятся в том же файле с SCRAM credentials:
+Пользователи хранятся в `config/config.yml` с SCRAM credentials:
 
 ```yaml
 users:
@@ -269,7 +257,7 @@ users:
     expires_at: null  # ISO 8601 datetime или null
 ```
 
-**Важно:** Используйте [`roxy user add`](#добавление-первого-пользователя) для генерации корректных credentials. Никогда не редактируйте SCRAM поля вручную.
+**Важно:** Используйте `roxy user add` для генерации корректных credentials. Никогда не редактируйте SCRAM поля вручную.
 
 ## 🎮 Использование
 
@@ -277,11 +265,11 @@ users:
 
 ```bash
 # Запуск с кастомной конфигурацией
-roxy server --config config/users.yml --port 8443
+roxy server --config config/config.yml --port 8443
 
 # С кастомными TLS сертификатами
 roxy server \
-  --config config/users.yml \
+  --config config/config.yml \
   --tls-cert /path/to/cert.pem \
   --tls-key /path/to/key.pem
 ```
@@ -306,7 +294,7 @@ roxy client --server localhost:8443 --user alice --skip-cert-verification
 
 ```bash
 # Мониторинг локального сервера
-roxy tui --config config/users.yml
+roxy tui --config config/config.yml
 
 # Мониторинг удаленного сервера (требует tui-remote)
 roxy tui --remote http://server.example.com:9090
@@ -323,9 +311,9 @@ roxy tui --remote http://server.example.com:9090
 
 ```bash
 # Добавить нового пользователя
-roxy user --config config/users.yml add --name bob
+roxy user --config config/config.yml add --name bob
 
-# Пользователи сохраняются в config/users.yml с SCRAM credentials
+# Пользователи сохраняются в config/config.yml с SCRAM credentials
 # Редактируйте права доступа, даты истечения вручную в YAML (но не SCRAM поля!)
 ```
 
@@ -352,7 +340,7 @@ docker run -d \
 
 ### Использование Docker Compose
 
-[`docker-compose.yml`](docker-compose.yml) предоставляет полную конфигурацию развертывания:
+[`docker-compose.yml`]([`docker-compose.yml`](docker-compose.yml)) предоставляет полную конфигурацию развертывания:
 
 ```yaml
 version: '3.8'
@@ -366,7 +354,6 @@ services:
         FEATURES: "tui-remote,quic-experimental"
     ports:
       - "8443:8443"      # ROXY сервер
-      - "1081:1081"      # SOCKS5 прямой прокси
       - "4433:4433/udp"  # QUIC (опционально)
       - "9090:9090"      # API метрик (tui-remote)
     volumes:
@@ -380,16 +367,9 @@ services:
 **Развертывание:**
 
 ```bash
-# Запуск всех сервисов через docker-compose
 docker-compose up -d
-
-# Просмотр логов
 docker-compose logs -f roxy-server
-
-# Добавление пользователя
-docker-compose exec roxy-server roxy user add --name alice
-
-# SOCKS5 будет доступен на портах 1081 (сервер) и 1080 (клиент)
+docker-compose exec roxy-server roxy user --config /app/config.yml add --name alice
 ```
 
 ## 🏗️ Архитектура
@@ -410,14 +390,14 @@ ROXY реализует кастомный DPI-устойчивый проток
 
 ### Ключевые компоненты
 
-- **[`src/server.rs`](src/server.rs)** - Асинхронный TLS сервер с обработкой соединений
-- **[`src/client.rs`](src/client.rs)** - Реализация клиента с SCRAM аутентификацией
-- **[`src/protocol.rs`](src/protocol.rs)** - Определения фреймов протокола ROXY
-- **[`src/auth.rs`](src/auth.rs)** - Аутентификация SCRAM-SHA-256
-- **[`src/crypto.rs`](src/crypto.rs)** - Криптографические примитивы
-- **[`src/obfuscation/`](src/obfuscation/)** - Формирование трафика и обфускация
-- **[`src/transport/`](src/transport/)** - Реализации SOCKS5 и QUIC
-- **[`src/tui/`](src/tui/)** - Терминальный интерфейс
+- [`src/server.rs`](src/server.rs) - Асинхронный TLS сервер с обработкой соединений
+- [`src/client.rs`](src/client.rs) - Реализация клиента с SCRAM аутентификацией
+- [`src/protocol.rs`](src/protocol.rs) - Определения фреймов протокола ROXY
+- [`src/auth.rs`](src/auth.rs) - Аутентификация SCRAM-SHA-256
+- [`src/crypto.rs`](src/crypto.rs) - Криптографические примитивы
+- [`src/obfuscation/`](src/obfuscation/) - Формирование трафика и обфускация
+- [`src/transport/`](src/transport/) - Реализации SOCKS5 и QUIC
+- [`src/tui/`](src/tui/) - Терминальный интерфейс
 
 ### Поток протокола
 
@@ -516,7 +496,7 @@ cargo +nightly bench
 
 ### Сообщения об уязвимостях
 
-Сообщайте о проблемах безопасности на: **security@yourproject.com** (доступен PGP ключ)
+Сообщайте о проблемах безопасности приватно автору проекта.
 
 Пожалуйста, **не создавайте** публичные issue для уязвимостей.
 
@@ -538,13 +518,13 @@ cargo +nightly bench
 О: QUIC экспериментальный (`quic-experimental`). Используйте TCP+TLS для продакшена.
 
 **В: Как обновить права пользователя?**
-О: Отредактируйте [`config/users.yml`](config/users.yml) и перезапустите сервер. Не изменяйте SCRAM credentials поля.
+О: Отредактируйте [`config/config.yml`](config/config.yml) и перезапустите сервер. Не изменяйте SCRAM credentials поля.
 
 **В: Можно ли запустить несколько серверов?**
 О: Да, используйте разные порты или IP адреса в конфигурации.
 
 **В: Какие уровни логирования доступны?**
-О: `TRACE`, `DEBUG`, `INFO` (по умолчанию), `WARN`, `ERROR`. Устанавливается через [`log_level`](config/config.yml:5) в конфигурации.
+О: `TRACE`, `DEBUG`, `INFO` (по умолчанию), `WARN`, `ERROR`. Устанавливается через `log_level` в [`config/config.yml`](config/config.yml).
 
 ## 🤝 Участие в проекте
 
@@ -564,11 +544,9 @@ cargo +nightly bench
 - Запускайте `cargo clippy` и `cargo fmt` перед коммитом
 - Пишите понятные commit сообщения
 
-См. [CONTRIBUTING.md](CONTRIBUTING.md) для подробностей.
-
 ## 📄 Лицензия
 
-Этот проект лицензирован под MIT License - см. файл [LICENSE](LICENSE) для деталей.
+Этот проект лицензирован под MIT License - см. [Cargo.toml](Cargo.toml) для деталей.
 
 ## 🙏 Благодарности
 
@@ -577,12 +555,5 @@ cargo +nightly bench
 - [ratatui](https://github.com/ratatui-org/ratatui) - Фреймворк терминального интерфейса
 - [Tor Project](https://www.torproject.org/) - Вдохновение для техник обфускации
 
-## 📞 Контакты
-
-- Issues: [GitHub Issues](https://github.com/yourusername/roxy/issues)
-- Обсуждения: [GitHub Discussions](https://github.com/yourusername/roxy/discussions)
-- Email: support@yourproject.com
-
 ---
-
 **⚠️ Отказ от ответственности:** Это программное обеспечение предоставляется в образовательных и исследовательских целях. Пользователи несут ответственность за соблюдение местных законов и правил. Авторы не несут ответственности за неправомерное использование.

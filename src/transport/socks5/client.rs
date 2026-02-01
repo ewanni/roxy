@@ -234,7 +234,7 @@ async fn perform_roxy_handshake(
     let mut challenge_data = frame_len_buf.to_vec();
     challenge_data.extend_from_slice(&frame_buf);
 
-    let challenge_frame = FrameParser::parse(&challenge_data)?;
+    let (challenge_frame, _) = FrameParser::parse(&challenge_data)?;
     let (session_id, server_nonce, _auth_method, challenge_bytes) = match challenge_frame {
         Frame::RoxyChallenge(ch) => (ch.session_id, ch.server_nonce, ch.auth_method, ch.challenge_data),
         _ => return Err(anyhow!("Expected ROXY_CHALLENGE")),
@@ -282,7 +282,7 @@ async fn perform_roxy_handshake(
     let mut welcome_data = frame_len_buf.to_vec();
     welcome_data.extend_from_slice(&frame_buf);
 
-    let welcome_frame = FrameParser::parse(&welcome_data)?;
+    let (welcome_frame, _) = FrameParser::parse(&welcome_data)?;
     let (status, _obf_config, _server_final) = match welcome_frame {
         Frame::RoxyWelcome(w) => (w.status, w.obf_config, w.server_final),
         _ => return Err(anyhow!("Expected ROXY_WELCOME")),
@@ -391,7 +391,7 @@ async fn recv_data_frame(
     let mut frame_data = frame_len_buf.to_vec();
     frame_data.extend_from_slice(&frame_buf);
 
-    let frame = FrameParser::parse(&frame_data)?;
+    let (frame, _) = FrameParser::parse(&frame_data)?;
     match frame {
         Frame::Data(df) => {
             let nonce = Nonce::from_slice(&df.nonce);
@@ -419,7 +419,7 @@ async fn recv_data_frame_async(
     let mut frame_data = frame_len_buf.to_vec();
     frame_data.extend_from_slice(&frame_buf);
 
-    let frame = FrameParser::parse(&frame_data)?;
+    let (frame, _) = FrameParser::parse(&frame_data)?;
     match frame {
         Frame::Data(df) => {
             let nonce = Nonce::from_slice(&df.nonce);

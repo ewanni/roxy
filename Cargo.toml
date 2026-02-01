@@ -30,7 +30,7 @@ clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0"
 thiserror = "1.0"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "smallvec"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "smallvec","ansi"] }
 tracing-appender = { version = "0.2", default-features = false }
 
 # Cryptography: RNG, stream cipher, and hashing

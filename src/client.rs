@@ -366,14 +366,18 @@ impl RoxyClient {
                 }
                 read_buf.extend_from_slice(&buf[..n]);
                 if read_buf.len() >= 4 {
-                    let len = u32::from_be_bytes([read_buf[0], read_buf[1], read_buf[2], read_buf[3]]) as usize;
-                    if len > crate::protocol::MAX_FRAME_SIZE {
-                        return Err(anyhow!("Frame size exceeds maximum"));
-                    }
-                    if read_buf.len() >= 4 + len {
-                        let frame_data = read_buf[4..4 + len].to_vec();
-                        read_buf.drain(..4 + len);
-                        break FrameParser::parse(&frame_data);
+                    match FrameParser::parse(&read_buf) {
+                        Ok((frame, consumed)) => {
+                            read_buf.drain(..consumed);
+                            break Ok(frame);
+                        }
+                        Err(e) => {
+                            if e.to_string().contains("Incomplete frame") {
+                                continue;
+                            } else {
+                                break Err(e);
+                            }
+                        }
                     }
                 }
             }
@@ -427,14 +431,18 @@ impl RoxyClient {
                 }
                 read_buf.extend_from_slice(&buf[..n]);
                 if read_buf.len() >= 4 {
-                    let len = u32::from_be_bytes([read_buf[0], read_buf[1], read_buf[2], read_buf[3]]) as usize;
-                    if len > crate::protocol::MAX_FRAME_SIZE {
-                        return Err(anyhow!("Frame size exceeds maximum"));
-                    }
-                    if read_buf.len() >= 4 + len {
-                        let frame_data = read_buf[4..4 + len].to_vec();
-                        read_buf.drain(..4 + len);
-                        break FrameParser::parse(&frame_data);
+                    match FrameParser::parse(&read_buf) {
+                        Ok((frame, consumed)) => {
+                            read_buf.drain(..consumed);
+                            break Ok(frame);
+                        }
+                        Err(e) => {
+                            if e.to_string().contains("Incomplete frame") {
+                                continue;
+                            } else {
+                                break Err(e);
+                            }
+                        }
                     }
                 }
             }
@@ -563,14 +571,18 @@ impl RoxyClient {
                     }
                     read_buf.extend_from_slice(&buf[..n]);
                     if read_buf.len() >= 4 {
-                        let len = u32::from_be_bytes([read_buf[0], read_buf[1], read_buf[2], read_buf[3]]) as usize;
-                        if len > crate::protocol::MAX_FRAME_SIZE {
-                            return Err(anyhow!("Frame size exceeds maximum"));
-                        }
-                        if read_buf.len() >= 4 + len {
-                            let frame_data = read_buf[4..4 + len].to_vec();
-                            read_buf.drain(..4 + len);
-                            break FrameParser::parse(&frame_data);
+                        match FrameParser::parse(&read_buf) {
+                            Ok((frame, consumed)) => {
+                                read_buf.drain(..consumed);
+                                break Ok(frame);
+                            }
+                            Err(e) => {
+                                if e.to_string().contains("Incomplete frame") {
+                                    continue;
+                                } else {
+                                    break Err(e);
+                                }
+                            }
                         }
                     }
                 }

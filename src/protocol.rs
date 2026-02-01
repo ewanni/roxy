@@ -310,22 +310,27 @@ pub enum Frame {
 pub struct FrameParser;
 
 impl FrameParser {
-    /// Parse a frame from bytes (length-prefixed)
-    pub fn parse(data: &[u8]) -> anyhow::Result<Frame> {
+    /// Parse a frame from bytes (length-prefixed), returning the frame and consumed bytes
+    pub fn parse(data: &[u8]) -> anyhow::Result<(Frame, usize)> {
         if data.len() < 4 {
             return Err(anyhow!("Frame too short"));
         }
 
-        let mut cursor = Cursor::new(data);
-        let frame_len = cursor.read_u32::<BigEndian>()? as usize;
+        let frame_len = u32::from_be_bytes([data[0], data[1], data[2], data[3]]) as usize;
         if frame_len > MAX_FRAME_SIZE {
             return Err(anyhow!("Frame exceeds maximum size: {} > {}", frame_len, MAX_FRAME_SIZE));
         }
 
+        if data.len() < 4 + frame_len {
+            return Err(anyhow!("Incomplete frame"));
+        }
+
+        let frame_data = &data[4..4 + frame_len];
+        let mut cursor = Cursor::new(frame_data);
         let frame_type_byte = cursor.read_u8()?;
         let frame_type = FrameType::try_from(frame_type_byte)?;
 
-        match frame_type {
+        let frame = match frame_type {
             FrameType::RoxyInit => Self::parse_roxy_init(&mut cursor),
             FrameType::RoxyChallenge => Self::parse_roxy_challenge(&mut cursor),
             FrameType::RoxyAuth => Self::parse_roxy_auth(&mut cursor),
@@ -343,7 +348,9 @@ impl FrameParser {
             }
             FrameType::ControlAck => Ok(Frame::ControlAck),
             FrameType::Close => Ok(Frame::Close),
-        }
+        }?;
+
+        Ok((frame, 4 + frame_len))
     }
 
     fn parse_roxy_init(cursor: &mut Cursor<&[u8]>) -> anyhow::Result<Frame> {
@@ -709,7 +716,8 @@ mod tests {
         };
         let frame = Frame::RoxyInit(init);
         let data = FrameParser::serialize(&frame).unwrap();
-        let parsed = FrameParser::parse(&data).unwrap();
+        let (parsed, consumed) = FrameParser::parse(&data).unwrap();
+        assert_eq!(consumed, data.len());
 
         if let Frame::RoxyInit(parsed_init) = parsed {
             assert_eq!(parsed_init.version, PROTOCOL_VERSION);
@@ -731,7 +739,8 @@ mod tests {
         };
         let frame = Frame::Data(data_frame);
         let data = FrameParser::serialize(&frame).unwrap();
-        let parsed = FrameParser::parse(&data).unwrap();
+        let (parsed, consumed) = FrameParser::parse(&data).unwrap();
+        assert_eq!(consumed, data.len());
 
         if let Frame::Data(parsed_data) = parsed {
             assert_eq!(parsed_data.stream_id, 42);
@@ -917,7 +926,8 @@ mod tests {
     fn test_frame_control_ack_roundtrip() {
         let frame = Frame::ControlAck;
         let data = FrameParser::serialize(&frame).expect("Failed to serialize");
-        let parsed = FrameParser::parse(&data).expect("Failed to parse");
+        let (parsed, consumed) = FrameParser::parse(&data).expect("Failed to parse");
+        assert_eq!(consumed, data.len());
         assert!(matches!(parsed, Frame::ControlAck));
     }
 
@@ -968,7 +978,8 @@ mod tests {
             };
             let frame = Frame::RoxyInit(init);
             let data = FrameParser::serialize(&frame).expect("serialize failed");
-            let parsed = FrameParser::parse(&data).expect("parse failed");
+            let (parsed, consumed) = FrameParser::parse(&data).expect("parse failed");
+            prop_assert_eq!(consumed, data.len());
 
             match parsed {
                 Frame::RoxyInit(parsed_init) => {
@@ -985,12 +996,12 @@ mod tests {
         #[test]
         fn test_serialize_deserialize_roundtrip_data_frame(
             stream_id in any::<u32>(),
-            payload_len in 0u16..MAX_FIELD_SIZE as u16,
             flags in any::<u8>(),
             nonce in prop::array::uniform12(any::<u8>()),
             payload in prop::collection::vec(any::<u8>(), 0..MAX_FIELD_SIZE),
             padding in prop::collection::vec(any::<u8>(), 0..MAX_FRAME_PADDING as usize)
         ) {
+            let payload_len = payload.len() as u16;
             let data_frame = DataFrame {
                 stream_id,
                 payload_len,
@@ -1001,7 +1012,8 @@ mod tests {
             };
             let frame = Frame::Data(data_frame);
             let data = FrameParser::serialize(&frame).expect("serialize failed");
-            let parsed = FrameParser::parse(&data).expect("parse failed");
+            let (parsed, consumed) = FrameParser::parse(&data).expect("parse failed");
+            prop_assert_eq!(consumed, data.len());
 
             match parsed {
                 Frame::Data(parsed_data) => {

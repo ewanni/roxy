@@ -433,58 +433,71 @@ impl Server {
             }
 
             // Try to parse frames from read_buf
-            while let Some(frame_data) = Self::extract_frame(&mut read_buf) {
-                let frame = FrameParser::parse(&frame_data)?;
+            while read_buf.len() >= 4 {
+                match FrameParser::parse(&read_buf) {
+                    Ok((frame, consumed)) => {
+                        read_buf.drain(..consumed);
 
-                // Update username from session if available
-                if session.username.is_some() && username.is_none() {
-                    username = session.username.clone();
-                    // Update session info with username after auth
-                    let user = username.clone().unwrap_or_default();
-                    let mut metrics_guard = metrics.write().await;
-                    if let Some(session_info) = metrics_guard.active_sessions.get_mut(&session_id) {
-                        session_info.username = user;
-                    }
-                }
-
-                match Self::handle_frame(frame, &mut session, &config).await {
-                    Ok(Some(response_frame)) => {
-                        let mut response_data = FrameParser::serialize(&response_frame)?;
-                        FrameParser::add_padding(&mut response_data, 255);
-
-                        // Apply DPI bypass obfuscation: traffic shaping with padding and jitter
-                        let shaper = TrafficShaper::new();
-                        let _shaped_chunks = shaper.shape(&response_data);
-                        // In production, send shaped chunks with timing delays
-                        // For now, padding is applied above; timing jitter would be applied here
-                        
-                        // Apply bandwidth limiting
-                        if let Some(limiter) = &session.bandwidth_limiter {
-                            let data_size = response_data.len() as u32;
-                            if let Some(data_size_nz) = std::num::NonZeroU32::new(data_size) {
-                                if limiter.check_n(data_size_nz).is_err() {
-                                    warn!("Bandwidth limit exceeded for user '{}', dropping {} bytes", session.username.as_ref().unwrap_or(&"unknown".to_string()), data_size);
-                                    continue; // Drop the frame if limit exceeded
-                                }
+                        // Update username from session if available
+                        if session.username.is_some() && username.is_none() {
+                            username = session.username.clone();
+                            // Update session info with username after auth
+                            let user = username.clone().unwrap_or_default();
+                            let mut metrics_guard = metrics.write().await;
+                            if let Some(session_info) = metrics_guard.active_sessions.get_mut(&session_id) {
+                                session_info.username = user;
                             }
                         }
 
-                        stream.write_all(&response_data).await?;
-                        stream.flush().await?;
-                        
-                        // Track bytes sent to client
-                        total_bytes_sent += response_data.len() as u64;
-                    }
-                    Ok(None) => {
-                        // No response needed
+                        match Self::handle_frame(frame, &mut session, &config).await {
+                            Ok(Some(response_frame)) => {
+                                let mut response_data = FrameParser::serialize(&response_frame)?;
+                                FrameParser::add_padding(&mut response_data, 255);
+
+                                // Apply DPI bypass obfuscation: traffic shaping with padding and jitter
+                                let shaper = TrafficShaper::new();
+                                let _shaped_chunks = shaper.shape(&response_data);
+                                // In production, send shaped chunks with timing delays
+                                // For now, padding is applied above; timing jitter would be applied here
+
+                                // Apply bandwidth limiting
+                                if let Some(limiter) = &session.bandwidth_limiter {
+                                    let data_size = response_data.len() as u32;
+                                    if let Some(data_size_nz) = std::num::NonZeroU32::new(data_size) {
+                                        if limiter.check_n(data_size_nz).is_err() {
+                                            warn!("Bandwidth limit exceeded for user '{}', dropping {} bytes", session.username.as_ref().unwrap_or(&"unknown".to_string()), data_size);
+                                            continue; // Drop the frame if limit exceeded
+                                        }
+                                    }
+                                }
+
+                                stream.write_all(&response_data).await?;
+                                stream.flush().await?;
+
+                                // Track bytes sent to client
+                                total_bytes_sent += response_data.len() as u64;
+                            }
+                            Ok(None) => {
+                                // No response needed
+                            }
+                            Err(e) => {
+                                warn!("Frame handling error: {}", e);
+                                // Send close frame
+                                let close_frame = Frame::Close;
+                                let close_data = FrameParser::serialize(&close_frame)?;
+                                stream.write_all(&close_data).await?;
+                                return Err(e);
+                            }
+                        }
                     }
                     Err(e) => {
-                        warn!("Frame handling error: {}", e);
-                        // Send close frame
-                        let close_frame = Frame::Close;
-                        let close_data = FrameParser::serialize(&close_frame)?;
-                        stream.write_all(&close_data).await?;
-                        return Err(e);
+                        if e.to_string().contains("Incomplete frame") {
+                            // Wait for more data
+                            break;
+                        } else {
+                            warn!("Invalid frame: {}", e);
+                            break;
+                        }
                     }
                 }
             }
@@ -505,32 +518,6 @@ impl Server {
         Ok(())
     }
 
-    /// Extract a complete frame from buffer (length-prefixed)
-    fn extract_frame(buf: &mut Vec<u8>) -> Option<Vec<u8>> {
-        if buf.len() < 4 {
-            return None;
-        }
-
-        // Read frame length (big-endian u32)
-        let len = u32::from_be_bytes([buf[0], buf[1], buf[2], buf[3]]) as usize;
-
-        if len > crate::protocol::MAX_FRAME_SIZE {
-            return None;
-        }
-
-        // Check if we have the complete frame
-        if buf.len() < 4 + len {
-            return None;
-        }
-
-        // Extract frame data (excluding length prefix)
-        let frame = buf[4..4 + len].to_vec();
-
-        // Remove processed data from buffer
-        buf.drain(..4 + len);
-
-        Some(frame)
-    }
 
     /// Handle a protocol frame based on current state
     async fn handle_frame(

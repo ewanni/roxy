@@ -1,7 +1,3 @@
----
-**READ ONLY**
----
-
 # DPI-Resistant Protocol Design: Project ROXY
 
 ## Executive Summary

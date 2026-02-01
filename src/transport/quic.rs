@@ -216,7 +216,7 @@ mod quic_impl {
                         let frame_data = &buf[..n];
 
                         // Parse ROXY frame
-                        let frame = FrameParser::parse(frame_data)
+                        let (frame, _) = FrameParser::parse(frame_data)
                             .context("Failed to parse ROXY frame")?;
 
                         debug!("Received frame: {:?}", frame);
